@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Family World Cup 2026</title>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #020817; font-family: 'Trebuchet MS', 'Segoe UI', sans-serif; color: #f1f5f9; -webkit-font-smoothing: antialiased; }
+    button { cursor: pointer; font-family: inherit; border: none; background: none; }
+    ::-webkit-scrollbar { height: 4px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    const ROLES = {
+      "Title Contender":      { color: "#FBBF24", icon: "👑" },
+      "Dark Horse":           { color: "#60A5FA", icon: "⚡" },
+      "Competitive Outsider": { color: "#A78BFA", icon: "🎯" },
+      "Underdog":             { color: "#34D399", icon: "🐾" },
+    };
+
+    const familyDraw = [
+      { name: "Robs",        "Title Contender": "Portugal",    "Dark Horse": "Austria",       "Competitive Outsider": "Canada",          "Underdog": "Czechia" },
+      { name: "Cameron",     "Title Contender": "Brazil",      "Dark Horse": "Türkiye",       "Competitive Outsider": "Panama",          "Underdog": "Sweden" },
+      { name: "Megs",        "Title Contender": "Belgium",     "Dark Horse": "Türkiye",       "Competitive Outsider": "South Korea",     "Underdog": "DR Congo" },
+      { name: "Wendy",       "Title Contender": "Netherlands", "Dark Horse": "Austria",       "Competitive Outsider": "Algeria",         "Underdog": "Haiti" },
+      { name: "Tim",         "Title Contender": "Germany",     "Dark Horse": "Austria",       "Competitive Outsider": "Algeria",         "Underdog": "Cabo Verde" },
+      { name: "Mouse",       "Title Contender": "Belgium",     "Dark Horse": "Ecuador",       "Competitive Outsider": "Panama",          "Underdog": "New Zealand" },
+      { name: "Jordan",      "Title Contender": "Argentina",   "Dark Horse": "Iran",          "Competitive Outsider": "Egypt",           "Underdog": "Ghana" },
+      { name: "Mandi",       "Title Contender": "Brazil",      "Dark Horse": "Uruguay",       "Competitive Outsider": "Egypt",           "Underdog": "Scotland" },
+      { name: "Debs",        "Title Contender": "England",     "Dark Horse": "Japan",         "Competitive Outsider": "Côte d'Ivoire",   "Underdog": "South Africa" },
+      { name: "Ash",         "Title Contender": "France",      "Dark Horse": "USA",           "Competitive Outsider": "Canada",          "Underdog": "Iraq" },
+      { name: "Dad",         "Title Contender": "Argentina",   "Dark Horse": "Ecuador",       "Competitive Outsider": "Australia",       "Underdog": "South Africa" },
+      { name: "Greg",        "Title Contender": "Spain",       "Dark Horse": "Senegal",       "Competitive Outsider": "Australia",       "Underdog": "Tunisia" },
+      { name: "Mike",        "Title Contender": "Germany",     "Dark Horse": "USA",           "Competitive Outsider": "Panama",          "Underdog": "Qatar" },
+      { name: "Lisa",        "Title Contender": "Croatia",     "Dark Horse": "Mexico",        "Competitive Outsider": "Côte d'Ivoire",   "Underdog": "Bosnia & Herz." },
+      { name: "Byron",       "Title Contender": "Croatia",     "Dark Horse": "Türkiye",       "Competitive Outsider": "Norway",          "Underdog": "Czechia" },
+      { name: "Albert",      "Title Contender": "Croatia",     "Dark Horse": "Ecuador",       "Competitive Outsider": "South Korea",     "Underdog": "Saudi Arabia" },
+      { name: "Heidi",       "Title Contender": "Morocco",     "Dark Horse": "Uruguay",       "Competitive Outsider": "South Korea",     "Underdog": "Jordan" },
+      { name: "Linds",       "Title Contender": "Spain",       "Dark Horse": "Mexico",        "Competitive Outsider": "Côte d'Ivoire",   "Underdog": "Tunisia" },
+      { name: "Tristan",     "Title Contender": "Germany",     "Dark Horse": "Colombia",      "Competitive Outsider": "Norway",          "Underdog": "Uzbekistan" },
+      { name: "Trev",        "Title Contender": "England",     "Dark Horse": "Mexico",        "Competitive Outsider": "Côte d'Ivoire",   "Underdog": "Saudi Arabia" },
+      { name: "Amy",         "Title Contender": "Netherlands", "Dark Horse": "Switzerland",   "Competitive Outsider": "Egypt",           "Underdog": "Scotland" },
+      { name: "Sarah",       "Title Contender": "France",      "Dark Horse": "Colombia",      "Competitive Outsider": "Canada",          "Underdog": "Ghana" },
+      { name: "Shan",        "Title Contender": "Portugal",    "Dark Horse": "Japan",         "Competitive Outsider": "Australia",       "Underdog": "Paraguay" },
+      { name: "Jean",        "Title Contender": "Morocco",     "Dark Horse": "Iran",          "Competitive Outsider": "Norway",          "Underdog": "Iraq" },
+      { name: "Georgia",     "Title Contender": "Belgium",     "Dark Horse": "Switzerland",   "Competitive Outsider": "South Korea",     "Underdog": "Curaçao" },
+      { name: "Chelsea",     "Title Contender": "Belgium",     "Dark Horse": "Senegal",       "Competitive Outsider": "Algeria",         "Underdog": "Paraguay" },
+      { name: "Tristan DuP", "Title Contender": "Brazil",      "Dark Horse": "Switzerland",   "Competitive Outsider": "Egypt",           "Underdog": "Sweden" },
+    ];
+
+    const teamLookup = {};
+    familyDraw.forEach(member => {
+      Object.keys(ROLES).forEach(role => {
+        const team = member[role];
+        if (!teamLookup[team]) teamLookup[team] = [];
+        teamLookup[team].push({ name: member.name, role });
+      });
+    });
+
+    const fixtures = [
+      { date: "Jun 11", group: "A", team1: "Mexico",         team2: "South Africa",   time: "21:00" },
+      { date: "Jun 11", group: "A", team1: "South Korea",    team2: "Czechia",         time: "04:00" },
+      { date: "Jun 12", group: "B", team1: "Canada",         team2: "Bosnia & Herz.",  time: "21:00" },
+      { date: "Jun 12", group: "D", team1: "USA",            team2: "Paraguay",        time: "03:00" },
+      { date: "Jun 13", group: "B", team1: "Qatar",          team2: "Switzerland",     time: "21:00" },
+      { date: "Jun 13", group: "C", team1: "Brazil",         team2: "Morocco",         time: "00:00" },
+      { date: "Jun 13", group: "C", team1: "Haiti",          team2: "Scotland",        time: "03:00" },
+      { date: "Jun 13", group: "D", team1: "Australia",      team2: "Türkiye",         time: "06:00" },
+      { date: "Jun 14", group: "E", team1: "Germany",        team2: "Curaçao",         time: "19:00" },
+      { date: "Jun 14", group: "F", team1: "Netherlands",    team2: "Japan",           time: "22:00" },
+      { date: "Jun 14", group: "E", team1: "Côte d'Ivoire",  team2: "Ecuador",         time: "01:00" },
+      { date: "Jun 14", group: "F", team1: "Tunisia",        team2: "Sweden",          time: "04:00" },
+      { date: "Jun 15", group: "H", team1: "Spain",          team2: "Cabo Verde",      time: "18:00" },
+      { date: "Jun 15", group: "G", team1: "Belgium",        team2: "Egypt",           time: "21:00" },
+      { date: "Jun 15", group: "H", team1: "Saudi Arabia",   team2: "Uruguay",         time: "00:00" },
+      { date: "Jun 15", group: "G", team1: "Iran",           team2: "New Zealand",     time: "03:00" },
+      { date: "Jun 16", group: "I", team1: "France",         team2: "Senegal",         time: "21:00" },
+      { date: "Jun 16", group: "I", team1: "Iraq",           team2: "Norway",          time: "00:00" },
+      { date: "Jun 16", group: "J", team1: "Argentina",      team2: "Algeria",         time: "03:00" },
+      { date: "Jun 16", group: "J", team1: "Austria",        team2: "Jordan",          time: "06:00" },
+      { date: "Jun 17", group: "K", team1: "Portugal",       team2: "DR Congo",        time: "19:00" },
+      { date: "Jun 17", group: "L", team1: "England",        team2: "Croatia",         time: "22:00" },
+      { date: "Jun 17", group: "L", team1: "Ghana",          team2: "Panama",          time: "01:00" },
+      { date: "Jun 17", group: "K", team1: "Uzbekistan",     team2: "Colombia",        time: "04:00" },
+      { date: "Jun 18", group: "A", team1: "Czechia",        team2: "South Africa",    time: "18:00" },
+      { date: "Jun 18", group: "B", team1: "Switzerland",    team2: "Bosnia & Herz.",  time: "21:00" },
+      { date: "Jun 18", group: "B", team1: "Canada",         team2: "Qatar",           time: "00:00" },
+      { date: "Jun 18", group: "A", team1: "Mexico",         team2: "South Korea",     time: "03:00" },
+      { date: "Jun 19", group: "D", team1: "USA",            team2: "Australia",       time: "21:00" },
+      { date: "Jun 19", group: "C", team1: "Scotland",       team2: "Morocco",         time: "21:00" },
+      { date: "Jun 19", group: "C", team1: "Brazil",         team2: "Haiti",           time: "03:00" },
+      { date: "Jun 19", group: "D", team1: "Türkiye",        team2: "Paraguay",        time: "06:00" },
+      { date: "Jun 20", group: "F", team1: "Netherlands",    team2: "Sweden",          time: "19:00" },
+      { date: "Jun 20", group: "E", team1: "Germany",        team2: "Côte d'Ivoire",   time: "22:00" },
+      { date: "Jun 20", group: "E", team1: "Ecuador",        team2: "Curaçao",         time: "02:00" },
+      { date: "Jun 20", group: "F", team1: "Tunisia",        team2: "Japan",           time: "06:00" },
+      { date: "Jun 21", group: "H", team1: "Spain",          team2: "Saudi Arabia",    time: "18:00" },
+      { date: "Jun 21", group: "G", team1: "Belgium",        team2: "Iran",            time: "21:00" },
+      { date: "Jun 21", group: "H", team1: "Uruguay",        team2: "Cabo Verde",      time: "00:00" },
+      { date: "Jun 21", group: "G", team1: "New Zealand",    team2: "Egypt",           time: "03:00" },
+      { date: "Jun 22", group: "J", team1: "Argentina",      team2: "Austria",         time: "19:00" },
+      { date: "Jun 22", group: "I", team1: "France",         team2: "Iraq",            time: "23:00" },
+      { date: "Jun 22", group: "I", team1: "Norway",         team2: "Senegal",         time: "02:00" },
+      { date: "Jun 22", group: "J", team1: "Jordan",         team2: "Algeria",         time: "05:00" },
+      { date: "Jun 23", group: "K", team1: "Portugal",       team2: "Uzbekistan",      time: "19:00" },
+      { date: "Jun 23", group: "L", team1: "England",        team2: "Ghana",           time: "22:00" },
+      { date: "Jun 23", group: "L", team1: "Panama",         team2: "Croatia",         time: "01:00" },
+      { date: "Jun 23", group: "K", team1: "Colombia",       team2: "DR Congo",        time: "04:00" },
+      { date: "Jun 24", group: "B", team1: "Switzerland",    team2: "Canada",          time: "21:00" },
+      { date: "Jun 24", group: "B", team1: "Bosnia & Herz.", team2: "Qatar",           time: "21:00" },
+      { date: "Jun 24", group: "C", team1: "Brazil",         team2: "Scotland",        time: "00:00" },
+      { date: "Jun 24", group: "C", team1: "Morocco",        team2: "Haiti",           time: "00:00" },
+      { date: "Jun 24", group: "A", team1: "Mexico",         team2: "Czechia",         time: "03:00" },
+      { date: "Jun 24", group: "A", team1: "South Korea",    team2: "South Africa",    time: "03:00" },
+      { date: "Jun 25", group: "E", team1: "Ecuador",        team2: "Germany",         time: "22:00" },
+      { date: "Jun 25", group: "E", team1: "Curaçao",        team2: "Côte d'Ivoire",   time: "22:00" },
+      { date: "Jun 25", group: "F", team1: "Tunisia",        team2: "Netherlands",     time: "01:00" },
+      { date: "Jun 25", group: "F", team1: "Japan",          team2: "Sweden",          time: "01:00" },
+      { date: "Jun 25", group: "D", team1: "USA",            team2: "Türkiye",         time: "04:00" },
+      { date: "Jun 25", group: "D", team1: "Paraguay",       team2: "Australia",       time: "04:00" },
+      { date: "Jun 26", group: "I", team1: "Norway",         team2: "France",          time: "21:00" },
+      { date: "Jun 26", group: "I", team1: "Senegal",        team2: "Iraq",            time: "21:00" },
+      { date: "Jun 26", group: "H", team1: "Uruguay",        team2: "Spain",           time: "02:00" },
+      { date: "Jun 26", group: "H", team1: "Cabo Verde",     team2: "Saudi Arabia",    time: "02:00" },
+      { date: "Jun 26", group: "G", team1: "New Zealand",    team2: "Belgium",         time: "05:00" },
+      { date: "Jun 26", group: "G", team1: "Egypt",          team2: "Iran",            time: "05:00" },
+      { date: "Jun 27", group: "L", team1: "Panama",         team2: "England",         time: "23:00" },
+      { date: "Jun 27", group: "L", team1: "Croatia",        team2: "Ghana",           time: "23:00" },
+      { date: "Jun 27", group: "K", team1: "Colombia",       team2: "Portugal",        time: "01:30" },
+      { date: "Jun 27", group: "K", team1: "Uzbekistan",     team2: "DR Congo",        time: "01:30" },
+      { date: "Jun 27", group: "J", team1: "Algeria",        team2: "Austria",         time: "04:00" },
+      { date: "Jun 27", group: "J", team1: "Jordan",         team2: "Argentina",       time: "04:00" },
+    ];
+
+    const allDates = [...new Set(fixtures.map(f => f.date))];
+    const allNames = familyDraw.map(m => m.name).sort();
+
+    function timeIcon(t) {
+      const h = parseInt(t.split(":")[0]);
+      if (h < 7) return "🌙";
+      if (h < 12) return "🌅";
+      return "⚽";
+    }
+
+    function Chip({ name, role }) {
+      const { color, icon } = ROLES[role];
+      return (
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 4,
+          padding: "2px 8px", borderRadius: 99,
+          background: color + "22", border: `1px solid ${color}55`,
+          color, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+        }}>
+          {icon} {name}
+        </span>
+      );
+    }
+
+    function FixtureCard({ fixture }) {
+      const t1 = teamLookup[fixture.team1] || [];
+      const t2 = teamLookup[fixture.team2] || [];
+      const t1names = new Set(t1.map(m => m.name));
+      const t2names = new Set(t2.map(m => m.name));
+      const bothSides = [...t1names].filter(n => t2names.has(n));
+      const hasStake = t1.length > 0 || t2.length > 0;
+
+      return (
+        <div style={{
+          background: hasStake ? "#0f172a" : "#080f1e",
+          border: `1px solid ${hasStake ? "#1e3a5f" : "#111827"}`,
+          borderRadius: 12, padding: "14px 16px", marginBottom: 10,
+          opacity: hasStake ? 1 : 0.4,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{
+              background: "#1e40af22", border: "1px solid #1e40af55",
+              color: "#60A5FA", fontSize: 11, fontWeight: 700,
+              padding: "2px 8px", borderRadius: 6, letterSpacing: 1,
+            }}>GROUP {fixture.group}</span>
+            <span style={{ color: "#94a3b8", fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+              {timeIcon(fixture.time)} {fixture.time}
+              <span style={{ color: "#475569", fontSize: 10, fontWeight: 400 }}>SAST</span>
+            </span>
+          </div>
+
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr auto 1fr",
+            alignItems: "center", gap: 12, marginBottom: hasStake ? 12 : 0,
+          }}>
+            <div style={{ textAlign: "right", color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{fixture.team1}</div>
+            <div style={{
+              color: "#64748b", fontWeight: 900, fontSize: 12, letterSpacing: 2,
+              padding: "4px 8px", background: "#1e293b", borderRadius: 6,
+            }}>VS</div>
+            <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: 15 }}>{fixture.team2}</div>
+          </div>
+
+          {hasStake && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "flex-end" }}>
+                {t1.map(m => <Chip key={m.name + m.role} name={m.name} role={m.role} />)}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {t2.map(m => <Chip key={m.name + m.role} name={m.name} role={m.role} />)}
+              </div>
+            </div>
+          )}
+
+          {bothSides.length > 0 && (
+            <div style={{ marginTop: 8, textAlign: "center", color: "#f59e0b", fontSize: 11, fontStyle: "italic" }}>
+              ⚠️ Split allegiance: {bothSides.join(", ")}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function App() {
+      const [selectedDate, setSelectedDate] = useState("All");
+      const [selectedMember, setSelectedMember] = useState(null);
+
+      const memberTeams = useMemo(() => {
+        if (!selectedMember) return null;
+        const m = familyDraw.find(x => x.name === selectedMember);
+        return new Set(Object.keys(ROLES).map(role => m[role]));
+      }, [selectedMember]);
+
+      const filtered = useMemo(() => {
+        let f = fixtures;
+        if (selectedDate !== "All") f = f.filter(x => x.date === selectedDate);
+        if (memberTeams) f = f.filter(x => memberTeams.has(x.team1) || memberTeams.has(x.team2));
+        return f;
+      }, [selectedDate, memberTeams]);
+
+      const withStake = filtered.filter(f =>
+        (teamLookup[f.team1] || []).length > 0 || (teamLookup[f.team2] || []).length > 0
+      ).length;
+
+      const btnBase = { borderRadius: 99, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid" };
+      const tabBase = { borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid", whiteSpace: "nowrap" };
+
+      return (
+        <div style={{ minHeight: "100vh", background: "#020817" }}>
+
+          <div style={{
+            background: "linear-gradient(135deg, #0a1628 0%, #0f2351 100%)",
+            borderBottom: "1px solid #1e3a5f",
+            padding: "24px 20px 16px", textAlign: "center",
+          }}>
+            <div style={{ fontSize: 28, marginBottom: 4 }}>🏆</div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, letterSpacing: 1, color: "#f1f5f9" }}>
+              Family World Cup 2026
+            </h1>
+            <p style={{ margin: "4px 0 8px", color: "#64748b", fontSize: 12 }}>
+              27 members · Group Stage · 72 matches · Times in SAST
+            </p>
+            <div style={{ display: "flex", justifyContent: "center", gap: 14, fontSize: 11, color: "#64748b" }}>
+              <span>⚽ Evening</span><span>🌙 Late / Early morning</span><span>🌅 Morning</span>
+            </div>
+          </div>
+
+          <div style={{
+            display: "flex", justifyContent: "center", flexWrap: "wrap",
+            gap: 10, padding: "10px 16px", borderBottom: "1px solid #111827", background: "#080f1e",
+          }}>
+            {Object.entries(ROLES).map(([role, { color, icon }]) => (
+              <span key={role} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color }}>
+                {icon} {role}
+              </span>
+            ))}
+          </div>
+
+          <div style={{ padding: "12px 16px 0", borderBottom: "1px solid #111827" }}>
+            <div style={{ fontSize: 11, color: "#475569", marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>
+              Filter by member
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingBottom: 12 }}>
+              <button onClick={() => setSelectedMember(null)} style={{ ...btnBase, padding: "4px 10px",
+                background: !selectedMember ? "#2563eb" : "transparent",
+                color: !selectedMember ? "#fff" : "#64748b",
+                borderColor: !selectedMember ? "#2563eb" : "#1e293b",
+              }}>All</button>
+              {allNames.map(name => (
+                <button key={name} onClick={() => setSelectedMember(selectedMember === name ? null : name)}
+                  style={{ ...btnBase, padding: "4px 10px",
+                    background: selectedMember === name ? "#2563eb" : "transparent",
+                    color: selectedMember === name ? "#fff" : "#94a3b8",
+                    borderColor: selectedMember === name ? "#2563eb" : "#1e293b",
+                  }}>{name}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ overflowX: "auto", borderBottom: "1px solid #111827", background: "#080f1e" }}>
+            <div style={{ display: "flex", padding: "8px 16px", gap: 6, minWidth: "max-content" }}>
+              <button onClick={() => setSelectedDate("All")} style={{ ...tabBase, padding: "5px 12px",
+                background: selectedDate === "All" ? "#FBBF24" : "transparent",
+                color: selectedDate === "All" ? "#000" : "#64748b",
+                borderColor: selectedDate === "All" ? "#FBBF24" : "#1e293b",
+              }}>All Dates</button>
+              {allDates.map(d => (
+                <button key={d} onClick={() => setSelectedDate(d)} style={{ ...tabBase, padding: "5px 12px",
+                  background: selectedDate === d ? "#FBBF24" : "transparent",
+                  color: selectedDate === d ? "#000" : "#64748b",
+                  borderColor: selectedDate === d ? "#FBBF24" : "#1e293b",
+                }}>{d}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ padding: "9px 16px", borderBottom: "1px solid #0f172a", fontSize: 11, color: "#475569" }}>
+            {filtered.length} matches · {withStake} with family stakes
+            {selectedMember && ` · ${selectedMember}: ${[...memberTeams].join(", ")}`}
+          </div>
+
+          <div style={{ padding: "12px 16px 48px" }}>
+            {filtered.length === 0
+              ? <div style={{ textAlign: "center", color: "#475569", padding: 48 }}>No matches found</div>
+              : filtered.map((f, i) => <FixtureCard key={i} fixture={f} />)
+            }
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
