@@ -296,7 +296,7 @@
       const both=[...t1n].filter(n=>t2n.has(n));
       const hasStake=t1.length>0||t2.length>0;
       return (
-        <div style={{ background:hasStake?"#0f172a":"#080f1e", border:`1px solid ${hasStake?"#1e3a5f":"#111827"}`, borderRadius:12, padding:"14px 16px", marginBottom:10, opacity:hasStake?1:0.4 }}>
+        <div style={{ background:hasStake?"#0f172a":"#080f1e", border:`1px solid ${hasStake?"#1e3a5f":"#111827"}`, borderRadius:12, padding:"10px 12px", opacity:hasStake?1:0.4 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
             <span style={{ background:"#1e40af22", border:"1px solid #1e40af55", color:"#60A5FA", fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:6, letterSpacing:1 }}>GROUP {fixture.group}</span>
             <span style={{ color:"#94a3b8", fontSize:13, fontWeight:700, display:"flex", alignItems:"center", gap:5 }}>
@@ -304,9 +304,9 @@
             </span>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", alignItems:"center", gap:12, marginBottom:hasStake?12:0 }}>
-            <div style={{ textAlign:"right", color:"#f1f5f9", fontWeight:700, fontSize:15 }}>{fixture.team1}</div>
-            <div style={{ color:"#64748b", fontWeight:900, fontSize:12, letterSpacing:2, padding:"4px 8px", background:"#1e293b", borderRadius:6 }}>VS</div>
-            <div style={{ color:"#f1f5f9", fontWeight:700, fontSize:15 }}>{fixture.team2}</div>
+            <div style={{ textAlign:"right", color:"#f1f5f9", fontWeight:700, fontSize:13 }}>{fixture.team1}</div>
+            <div style={{ color:"#64748b", fontWeight:900, fontSize:11, letterSpacing:1, padding:"3px 6px", background:"#1e293b", borderRadius:6 }}>VS</div>
+            <div style={{ color:"#f1f5f9", fontWeight:700, fontSize:13 }}>{fixture.team2}</div>
           </div>
           {hasStake && (
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
@@ -441,11 +441,11 @@
 
       return (
         <div style={{ minHeight:"100vh", background:"#020817" }}>
-          <div style={{ background:"linear-gradient(135deg,#0a1628 0%,#0f2351 100%)", borderBottom:"1px solid #1e3a5f", padding:"20px 20px 14px", textAlign:"center" }}>
+          <div style={{ position:"relative", background:"linear-gradient(135deg,#0a1628 0%,#0f2351 100%)", borderBottom:"1px solid #1e3a5f", padding:"20px 20px 14px", textAlign:"center" }}>
+            <span style={{ position:"absolute", top:10, right:12, padding:"2px 8px", borderRadius:99, background:"#1e293b", border:"1px solid #334155", color:"#475569", fontSize:10, fontWeight:700, letterSpacing:1 }}>V6</span>
             <div style={{ fontSize:26, marginBottom:3 }}>🏆</div>
             <h1 style={{ margin:0, fontSize:21, fontWeight:900, letterSpacing:1, color:"#f1f5f9" }}>Family World Cup 2026</h1>
             <p style={{ margin:"3px 0 8px", color:"#64748b", fontSize:12 }}>27 members · 72 group matches · Times in SAST</p>
-            <span style={{ display:"inline-block", marginBottom:6, padding:"2px 8px", borderRadius:99, background:"#1e293b", border:"1px solid #334155", color:"#475569", fontSize:10, fontWeight:700, letterSpacing:1 }}>V5</span>
             <div style={{ display:"flex", justifyContent:"center", gap:14, fontSize:11, color:"#64748b" }}>
               <span>⚽ Evening</span><span>🌙 Late night</span><span>🌅 Morning</span>
             </div>
@@ -491,7 +491,12 @@
                 {selectedMember&&` · ${selectedMember}: ${[...memberTeams].join(", ")}`}
               </div>
               <div style={{ padding:"12px 16px 48px" }}>
-                {filtered.length===0?<div style={{ textAlign:"center", color:"#475569", padding:48 }}>No matches found</div>:filtered.map((f,i)=><FixtureCard key={i} fixture={f}/>)}
+                {filtered.length===0
+                  ? <div style={{ textAlign:"center", color:"#475569", padding:48 }}>No matches found</div>
+                  : <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8 }}>
+                      {filtered.map((f,i)=><FixtureCard key={i} fixture={f}/>)}
+                    </div>
+                }
               </div>
             </>
           )}
