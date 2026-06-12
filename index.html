@@ -251,6 +251,34 @@
       return all;
     }
 
+    function buildGroupStandings(results) {
+      // Build team membership per group from our fixture list
+      const groupTeams = {};
+      fixtures.forEach(f => {
+        if (!groupTeams[f.group]) groupTeams[f.group] = new Set();
+        groupTeams[f.group].add(f.team1);
+        groupTeams[f.group].add(f.team2);
+      });
+      const completed = results.filter(r => r.completed && r.round === 'GROUP');
+      if (completed.length === 0) return null;
+      return Object.entries(groupTeams)
+        .sort(([a],[b]) => a.localeCompare(b))
+        .map(([group, teamSet]) => {
+          const teams = [...teamSet].map(team => {
+            let w=0,d=0,l=0,gf=0,ga=0;
+            completed.forEach(r => {
+              const isT1=r.team1===team, isT2=r.team2===team;
+              if (!isT1&&!isT2) return;
+              const myG=isT1?r.score1:r.score2, opG=isT1?r.score2:r.score1;
+              gf+=myG; ga+=opG;
+              if (myG>opG) w++; else if (myG===opG) d++; else l++;
+            });
+            return { name:team, played:w+d+l, wins:w, draws:d, losses:l, gf, ga, gd:gf-ga, pts:w*3+d };
+          }).sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf||a.name.localeCompare(b.name));
+          return { name:`Group ${group}`, teams };
+        });
+    }
+
     function calcTeamPoints(teamName, results) {
       let pts = 0;
       for (const r of results) {
@@ -418,6 +446,86 @@
       );
     }
 
+    // ─── STANDINGS COMPONENTS ────────────────────────────────────
+    function GroupCard({ group }) {
+      return (
+        <div style={{ background:"#0f172a", border:"1px solid #1e3a5f", borderRadius:10, overflow:"hidden" }}>
+          <div style={{ padding:"7px 10px", background:"#1e293b", borderBottom:"1px solid #1e3a5f" }}>
+            <span style={{ color:"#60A5FA", fontWeight:700, fontSize:11, letterSpacing:1 }}>{group.name.toUpperCase()}</span>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 2ch 2ch 2ch 2ch 3ch", gap:"0 6px", padding:"5px 10px 4px", borderBottom:"1px solid #1e293b" }}>
+            {["Team","W","D","L","GD","Pts"].map(h=>(
+              <span key={h} style={{ color:"#475569", fontSize:9, fontWeight:700, textAlign:h==="Team"?"left":"center", textTransform:"uppercase", letterSpacing:0.5 }}>{h}</span>
+            ))}
+          </div>
+          {group.teams.map((team,i)=>{
+            const qualified=i<2;
+            const border=qualified?"2px solid #34D39988":i===2?"2px solid #FBBF2444":"2px solid transparent";
+            return (
+              <div key={team.name} style={{ display:"grid", gridTemplateColumns:"1fr 2ch 2ch 2ch 2ch 3ch", gap:"0 6px", padding:"6px 10px", borderBottom:i<group.teams.length-1?"1px solid #0a0f1e":"none", borderLeft:border, background:qualified?"rgba(52,211,153,0.04)":"transparent" }}>
+                <span style={{ color:qualified?"#f1f5f9":"#94a3b8", fontSize:11, fontWeight:qualified?600:400, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{team.name}</span>
+                <span style={{ color:"#64748b", fontSize:11, textAlign:"center" }}>{team.wins}</span>
+                <span style={{ color:"#64748b", fontSize:11, textAlign:"center" }}>{team.draws}</span>
+                <span style={{ color:"#64748b", fontSize:11, textAlign:"center" }}>{team.losses}</span>
+                <span style={{ color:team.gd>0?"#34D399":team.gd<0?"#f87171":"#64748b", fontSize:11, textAlign:"center" }}>{team.gd>0?`+${team.gd}`:team.gd}</span>
+                <span style={{ color:qualified?"#34D399":"#f1f5f9", fontSize:12, fontWeight:700, textAlign:"center" }}>{team.pts}</span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    function Standings() {
+      const [groups,setGroups]=useState(null);
+      const [loading,setLoading]=useState(false);
+      const [lastUpdated,setLastUpdated]=useState(null);
+      const [error,setError]=useState(null);
+      const [gamesProcessed,setGamesProcessed]=useState(0);
+
+      const load=useCallback(async()=>{
+        setLoading(true); setError(null);
+        try {
+          const results = await fetchAllResults();
+          const g = buildGroupStandings(results);
+          const completed = results.filter(r=>r.completed).length;
+          setGamesProcessed(completed);
+          if (g) { setGroups(g); setLastUpdated(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'})); }
+          else setGroups(null);
+        } catch(e) { setError("Couldn't load standings. Check your connection."); }
+        setLoading(false);
+      },[]);
+
+      useEffect(()=>{ load(); },[load]);
+
+      return (
+        <div style={{ padding:"12px 16px 48px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+            <div style={{ fontSize:11, color:"#475569" }}>{loading?"⏳ Loading standings…":lastUpdated?`Updated ${lastUpdated} · ${gamesProcessed} results in`:"Not yet loaded"}</div>
+            <button onClick={load} disabled={loading} style={{ padding:"5px 12px", borderRadius:6, fontSize:12, fontWeight:600, background:loading?"#0f172a":"#1e3a5f", color:loading?"#475569":"#60A5FA", border:"1px solid #1e3a5f" }}>{loading?"Loading…":"↻ Refresh"}</button>
+          </div>
+          <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:12, fontSize:10, color:"#475569" }}>
+            <span style={{ borderLeft:"3px solid #34D399", paddingLeft:5, color:"#34D399" }}>Qualifying (top 2)</span>
+            <span style={{ borderLeft:"3px solid #FBBF2488", paddingLeft:5 }}>Possible best 3rd</span>
+          </div>
+          {error&&<div style={{ background:"#1a1010", border:"1px solid #7f1d1d", borderRadius:8, padding:"10px 14px", marginBottom:12, color:"#fca5a5", fontSize:12 }}>{error}</div>}
+          {!loading&&!groups&&!error&&(
+            <div style={{ textAlign:"center", padding:"40px 20px", color:"#475569" }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>🌍</div>
+              <div style={{ fontSize:14, fontWeight:600, color:"#64748b", marginBottom:4 }}>Waiting for results to come in</div>
+              <div style={{ fontSize:12, marginBottom:4 }}>Standings build automatically as games complete</div>
+              <div style={{ fontSize:11, color:"#334155" }}>ESPN's data may take a few hours to update after each game</div>
+            </div>
+          )}
+          {groups&&(
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8 }}>
+              {groups.map(g=><GroupCard key={g.name} group={g}/>)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function App() {
       const [tab,setTab]=useState("schedule");
       const [selectedDate,setSelectedDate]=useState("All");
@@ -443,7 +551,7 @@
       return (
         <div style={{ minHeight:"100vh", background:"#020817" }}>
           <div style={{ position:"relative", background:"linear-gradient(135deg,#0a1628 0%,#0f2351 100%)", borderBottom:"1px solid #1e3a5f", padding:"20px 20px 14px", textAlign:"center" }}>
-            <span style={{ position:"absolute", top:10, right:12, padding:"2px 8px", borderRadius:99, background:"#1e293b", border:"1px solid #334155", color:"#475569", fontSize:10, fontWeight:700, letterSpacing:1 }}>V6</span>
+            <span style={{ position:"absolute", top:10, right:12, padding:"2px 8px", borderRadius:99, background:"#1e293b", border:"1px solid #334155", color:"#475569", fontSize:10, fontWeight:700, letterSpacing:1 }}>V7</span>
             <div style={{ fontSize:26, marginBottom:3 }}>🏆</div>
             <h1 style={{ margin:0, fontSize:21, fontWeight:900, letterSpacing:1, color:"#f1f5f9" }}>Family World Cup 2026</h1>
             <p style={{ margin:"3px 0 8px", color:"#64748b", fontSize:12 }}>27 members · 72 group matches · Times in SAST</p>
@@ -453,9 +561,9 @@
           </div>
 
           <div style={{ display:"flex", borderBottom:"1px solid #1e293b", background:"#080f1e" }}>
-            {["schedule","leaderboard"].map(t=>(
-              <button key={t} onClick={()=>setTab(t)} style={{ flex:1, padding:"12px 0", fontSize:13, fontWeight:700, color:tab===t?"#f1f5f9":"#475569", borderBottom:tab===t?"2px solid #FBBF24":"2px solid transparent", textTransform:"capitalize", letterSpacing:0.5 }}>
-                {t==="schedule"?"📅 Schedule":"🏅 Leaderboard"}
+            {["schedule","leaderboard","standings"].map(t=>(
+              <button key={t} onClick={()=>setTab(t)} style={{ flex:1, padding:"11px 0", fontSize:12, fontWeight:700, color:tab===t?"#f1f5f9":"#475569", borderBottom:tab===t?"2px solid #FBBF24":"2px solid transparent", letterSpacing:0.3 }}>
+                {t==="schedule"?"📅 Schedule":t==="leaderboard"?"🏅 Family":"🌍 Standings"}
               </button>
             ))}
           </div>
@@ -503,6 +611,7 @@
           )}
 
           {tab==="leaderboard" && <Leaderboard/>}
+          {tab==="standings" && <Standings/>}
         </div>
       );
     }
