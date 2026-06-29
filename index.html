@@ -162,6 +162,23 @@
       { date: "Jun 28", group: "K", team1: "Uzbekistan",     team2: "DR Congo",        time: "01:30" }, // 7:30pm ET Jun 27
       { date: "Jun 28", group: "J", team1: "Algeria",        team2: "Austria",         time: "04:00" }, // 10pm ET Jun 27
       { date: "Jun 28", group: "J", team1: "Jordan",         team2: "Argentina",       time: "04:00" }, // 10pm ET Jun 27
+      // ═══ ROUND OF 32 (SAST dates/times) ═══
+      { date: "Jun 29", group: "R32", team1: "South Africa",  team2: "Canada",          time: "03:00" }, // 9pm ET Jun 28
+      { date: "Jun 29", group: "R32", team1: "Brazil",        team2: "Japan",           time: "19:00" }, // 1pm ET Jun 29
+      { date: "Jun 29", group: "R32", team1: "Germany",       team2: "Paraguay",        time: "22:30" }, // 4:30pm ET Jun 29
+      { date: "Jun 30", group: "R32", team1: "Netherlands",   team2: "Morocco",         time: "03:00" }, // 9pm ET Jun 29
+      { date: "Jun 30", group: "R32", team1: "Côte d'Ivoire", team2: "Norway",          time: "19:00" }, // 1pm ET Jun 30
+      { date: "Jun 30", group: "R32", team1: "France",        team2: "Sweden",          time: "23:00" }, // 5pm ET Jun 30
+      { date: "Jul 1",  group: "R32", team1: "Mexico",        team2: "Ecuador",         time: "03:00" }, // 9pm ET Jun 30
+      { date: "Jul 1",  group: "R32", team1: "England",       team2: "DR Congo",        time: "18:00" }, // 12pm ET Jul 1
+      { date: "Jul 1",  group: "R32", team1: "Belgium",       team2: "Senegal",         time: "22:00" }, // 4pm ET Jul 1
+      { date: "Jul 2",  group: "R32", team1: "USA",           team2: "Bosnia & Herz.",  time: "02:00" }, // 8pm ET Jul 1
+      { date: "Jul 2",  group: "R32", team1: "Spain",         team2: "Austria",         time: "21:00" }, // 3pm ET Jul 2
+      { date: "Jul 3",  group: "R32", team1: "Portugal",      team2: "Croatia",         time: "01:00" }, // 7pm ET Jul 2
+      { date: "Jul 3",  group: "R32", team1: "Switzerland",   team2: "Algeria",         time: "05:00" }, // 11pm ET Jul 2
+      { date: "Jul 3",  group: "R32", team1: "Australia",     team2: "Egypt",           time: "20:00" }, // 2pm ET Jul 3
+      { date: "Jul 4",  group: "R32", team1: "Argentina",     team2: "Cabo Verde",      time: "00:00" }, // 6pm ET Jul 3
+      { date: "Jul 4",  group: "R32", team1: "Colombia",      team2: "Ghana",           time: "03:30" }, // 9:30pm ET Jul 3
     ];
 
     const allDates = [...new Set(fixtures.map(f => f.date))];
@@ -179,8 +196,8 @@
 
     const KNOCKOUT_ROUNDS = {
       R32:   ['20260628','20260629','20260630','20260701','20260702','20260703'],
-      R16:   ['20260705','20260706','20260707','20260708'],
-      QF:    ['20260710','20260711'],
+      R16:   ['20260704','20260705','20260706','20260707'],
+      QF:    ['20260709','20260710','20260711'],
       SF:    ['20260714','20260715'],
       THIRD: ['20260718'],
       FINAL: ['20260719'],
@@ -210,45 +227,105 @@
     function norm(n) { return ESPN_MAP[n] || n; }
     function getToday() { return new Date().toISOString().slice(0,10).replace(/-/g,''); }
 
-    async function fetchDate(dateStr) {
+    // Resilient JSON fetch: try ESPN directly, then fall back through CORS proxies.
+    // Throws if every attempt fails, so callers can distinguish "fetch failed"
+    // from "fetched fine but no games yet".
+    const PROXIES = [
+      (url) => url, // direct first — works if ESPN sends CORS headers
+      (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    ];
+
+    async function fetchJSON(url) {
+      let lastErr = null;
+      for (const wrap of PROXIES) {
+        try {
+          const res = await fetch(wrap(url));
+          if (!res.ok) { lastErr = new Error(`HTTP ${res.status}`); continue; }
+          return await res.json();
+        } catch (e) {
+          lastErr = e;
+          continue;
+        }
+      }
+      throw lastErr || new Error('All fetch attempts failed');
+    }
+
+    async function fetchDate(dateStr, includeScheduled) {
       const cacheKey = `wc26_${dateStr}`;
       const today = getToday();
+      // Only cache fully-past dates (completed) to avoid caching scheduled/live states
       if (dateStr < today) {
         try { const c = localStorage.getItem(cacheKey); if (c) return JSON.parse(c); } catch(e) {}
       }
-      try {
-        const res = await fetch(`${ESPN}/${LEAGUE}/scoreboard?dates=${dateStr}`);
-        if (!res.ok) return [];
-        const data = await res.json();
-        const results = [];
-        for (const ev of (data.events || [])) {
-          const comp = ev.competitions?.[0];
-          if (!comp) continue;
-          const completed = comp.status?.type?.completed;
-          const inProgress = comp.status?.type?.state === 'in';
-          if (!completed && !inProgress) continue;
-          const [c1, c2] = comp.competitors || [];
-          if (!c1 || !c2) continue;
-          const team1 = norm(c1.team?.displayName || c1.team?.name || '');
-          const team2 = norm(c2.team?.displayName || c2.team?.name || '');
-          const score1 = completed ? parseInt(c1.score || '0') : null;
-          const score2 = completed ? parseInt(c2.score || '0') : null;
-          const round = DATE_TO_ROUND[dateStr] || 'GROUP';
-          results.push({ dateStr, team1, team2, score1, score2, completed, round });
-        }
-        if (dateStr < today && results.length > 0) {
-          try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) {}
-        }
-        return results;
-      } catch(e) { return []; }
+      // Note: no try/catch here — if fetchJSON throws (network/CORS/proxy all failed),
+      // the error propagates up so the UI can show a real error instead of a
+      // misleading "no games yet" empty state.
+      const data = await fetchJSON(`${ESPN}/${LEAGUE}/scoreboard?dates=${dateStr}`);
+      const results = [];
+      for (const ev of (data.events || [])) {
+        const comp = ev.competitions?.[0];
+        if (!comp) continue;
+        const state = comp.status?.type?.state; // 'pre' | 'in' | 'post'
+        const completed = comp.status?.type?.completed;
+        const inProgress = state === 'in';
+        if (!completed && !inProgress && !includeScheduled) continue;
+        const [c1, c2] = comp.competitors || [];
+        if (!c1 || !c2) continue;
+        const team1 = norm(c1.team?.displayName || c1.team?.name || '');
+        const team2 = norm(c2.team?.displayName || c2.team?.name || '');
+        const score1 = (completed || inProgress) ? parseInt(c1.score || '0') : null;
+        const score2 = (completed || inProgress) ? parseInt(c2.score || '0') : null;
+        const adv1 = c1.advance === true || c1.winner === true;
+        const adv2 = c2.advance === true || c2.winner === true;
+        const winner = completed ? (adv1 ? team1 : adv2 ? team2 : (score1>score2?team1:score2>score1?team2:null)) : null;
+        const round = DATE_TO_ROUND[dateStr] || 'GROUP';
+        const statusDetail = comp.status?.type?.shortDetail || '';
+        results.push({ dateStr, team1, team2, score1, score2, completed, inProgress, state, winner, round, statusDetail });
+      }
+      if (dateStr < today && results.length > 0) {
+        try { localStorage.setItem(cacheKey, JSON.stringify(results)); } catch(e) {}
+      }
+      return results;
     }
 
     async function fetchAllResults() {
       const today = getToday();
       const toFetch = [...GROUP_DATES_ET, ...Object.values(KNOCKOUT_ROUNDS).flat()].filter(d => d <= today);
       const all = [];
-      for (const d of toFetch) { const r = await fetchDate(d); all.push(...r); }
+      let anyFailed = false, anySucceeded = false;
+      for (const d of toFetch) {
+        try { const r = await fetchDate(d); all.push(...r); anySucceeded = true; }
+        catch(e) { anyFailed = true; }
+      }
+      // If every single fetch failed, signal a hard error rather than "no games"
+      if (anyFailed && !anySucceeded) {
+        const err = new Error('FETCH_FAILED');
+        err.code = 'FETCH_FAILED';
+        throw err;
+      }
       return all;
+    }
+
+    // Knockout fetch — includes scheduled games so the bracket shows matchups before kickoff
+    async function fetchKnockout() {
+      const today = getToday();
+      const out = {};
+      for (const [round, dates] of Object.entries(KNOCKOUT_ROUNDS)) {
+        const matches = [];
+        for (const d of dates) {
+          // fetch dates up to and including today; include scheduled for upcoming
+          if (d > today) {
+            const r = await fetchDate(d, true);
+            matches.push(...r);
+          } else {
+            const r = await fetchDate(d, true);
+            matches.push(...r);
+          }
+        }
+        out[round] = matches;
+      }
+      return out;
     }
 
     function buildGroupStandings(results) {
@@ -327,7 +404,7 @@
       return (
         <div style={{ background:hasStake?"#0f172a":"#080f1e", border:`1px solid ${hasStake?"#1e3a5f":"#111827"}`, borderRadius:12, padding:"10px 12px", opacity:hasStake?1:0.4 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-            <span style={{ background:"#1e40af22", border:"1px solid #1e40af55", color:"#60A5FA", fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:6, letterSpacing:1 }}>GROUP {fixture.group}</span>
+            <span style={{ background:"#1e40af22", border:"1px solid #1e40af55", color:"#60A5FA", fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:6, letterSpacing:1 }}>{fixture.group==="R32"?"ROUND OF 32":`GROUP ${fixture.group}`}</span>
             <span style={{ color:"#94a3b8", fontSize:13, fontWeight:700, display:"flex", alignItems:"center", gap:5 }}>
               {timeIcon(fixture.time)} {fixture.time} <span style={{ color:"#475569", fontSize:10, fontWeight:400 }}>SAST</span>
             </span>
@@ -396,7 +473,11 @@
           const r=await fetchAllResults();
           setResults(r);
           setLastUpdated(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'}));
-        } catch(e) { setError("Couldn't load scores. Check your connection."); }
+        } catch(e) {
+          setError(e.code==='FETCH_FAILED'
+            ? "Couldn't reach the live scores service. This is usually temporary — tap Refresh in a moment. (If it persists, the score provider may be blocking requests.)"
+            : "Couldn't load scores. Check your connection.");
+        }
         setLoading(false);
       },[]);
 
@@ -430,12 +511,12 @@
             )}
           </div>
 
-          {!loading && gamesPlayed===0 && (
+          {!loading && !error && gamesPlayed===0 && (
             <div style={{ textAlign:"center", padding:"40px 20px", color:"#475569" }}>
               <div style={{ fontSize:40, marginBottom:12 }}>⏳</div>
-              <div style={{ fontSize:15, fontWeight:600, color:"#64748b", marginBottom:6 }}>Tournament hasn't started yet</div>
-              <div style={{ fontSize:12 }}>First kick-off: 11 June at 21:00 SAST</div>
-              <div style={{ fontSize:12, marginTop:4 }}>Mexico 🆚 South Africa — Group A</div>
+              <div style={{ fontSize:15, fontWeight:600, color:"#64748b", marginBottom:6 }}>No completed games loaded yet</div>
+              <div style={{ fontSize:12 }}>Scores populate automatically as matches finish.</div>
+              <div style={{ fontSize:12, marginTop:4 }}>Tap ↻ Refresh if results are missing.</div>
             </div>
           )}
 
@@ -526,6 +607,141 @@
       );
     }
 
+    // ─── BRACKET COMPONENTS ──────────────────────────────────────
+    const ROUND_LABELS = {
+      R32:   { title:"Round of 32",  short:"R32" },
+      R16:   { title:"Round of 16",  short:"R16" },
+      QF:    { title:"Quarter-finals", short:"QF" },
+      SF:    { title:"Semi-finals",  short:"SF" },
+      THIRD: { title:"Third-place playoff", short:"3rd" },
+      FINAL: { title:"Final",        short:"Final" },
+    };
+
+    function familyFor(team) {
+      return teamLookup[team] || [];
+    }
+
+    // Format ESPN's YYYYMMDD into "Sun 28 Jun". ESPN's dates are the ET kickoff
+    // date; knockout games kick off afternoon/evening ET = same-or-next-day SAST.
+    // We display the ET match date here, which matches how ESPN groups the fixtures.
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    function fmtDate(yyyymmdd) {
+      if (!yyyymmdd || yyyymmdd.length !== 8) return "";
+      const y = +yyyymmdd.slice(0,4), mo = +yyyymmdd.slice(4,6)-1, d = +yyyymmdd.slice(6,8);
+      const dt = new Date(Date.UTC(y, mo, d));
+      return `${WEEKDAYS[dt.getUTCDay()]} ${d} ${MONTHS[mo]}`;
+    }
+
+    function BracketMatch({ m }) {
+      const fam1 = familyFor(m.team1), fam2 = familyFor(m.team2);
+      const live = m.inProgress;
+      const done = m.completed;
+      const w1 = done && m.winner === m.team1;
+      const w2 = done && m.winner === m.team2;
+
+      const TeamRow = ({ team, score, won, fam }) => (
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:6, padding:"5px 8px", background: won?"#16331f":"transparent", borderRadius:6 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:5, minWidth:0 }}>
+            <span style={{ color: won?"#4ade80":done?"#64748b":"#f1f5f9", fontSize:12, fontWeight: won?700:500, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{team || "TBD"}</span>
+            {won && <span style={{ fontSize:10 }}>✓</span>}
+            {fam.length>0 && <span style={{ display:"flex", gap:2 }}>{fam.map(f=>(<span key={f.name+f.role} title={`${f.name} · ${f.role}`} style={{ fontSize:9 }}>{ROLES[f.role].icon}</span>))}</span>}
+          </div>
+          {(score!==null&&score!==undefined) && <span style={{ color: won?"#4ade80":"#94a3b8", fontSize:13, fontWeight:700, flexShrink:0 }}>{score}</span>}
+        </div>
+      );
+
+      return (
+        <div style={{ background:"#0f172a", border:`1px solid ${live?"#FBBF24":"#1e3a5f"}`, borderRadius:10, padding:4, position:"relative" }}>
+          {live && <span style={{ position:"absolute", top:-7, right:8, background:"#FBBF24", color:"#000", fontSize:8, fontWeight:800, padding:"1px 5px", borderRadius:99, letterSpacing:0.5 }}>● LIVE</span>}
+          {m.dateStr && <div style={{ textAlign:"center", color:"#475569", fontSize:9, fontWeight:600, letterSpacing:0.3, padding:"1px 0 3px" }}>{fmtDate(m.dateStr)}</div>}
+          <TeamRow team={m.team1} score={m.score1} won={w1} fam={fam1} />
+          <div style={{ height:1, background:"#1e293b", margin:"1px 8px" }} />
+          <TeamRow team={m.team2} score={m.score2} won={w2} fam={fam2} />
+          {(m.statusDetail && !done) && <div style={{ textAlign:"center", color:"#475569", fontSize:9, padding:"2px 0 1px" }}>{m.statusDetail}</div>}
+        </div>
+      );
+    }
+
+    function RoundColumn({ round, matches }) {
+      const label = ROUND_LABELS[round];
+      return (
+        <div style={{ marginBottom:18 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+            <span style={{ color:"#FBBF24", fontWeight:800, fontSize:13, letterSpacing:0.5 }}>{label.title}</span>
+            <span style={{ flex:1, height:1, background:"#1e293b" }} />
+            <span style={{ color:"#475569", fontSize:10 }}>{matches.length} {matches.length===1?"match":"matches"}</span>
+          </div>
+          {matches.length===0
+            ? <div style={{ color:"#334155", fontSize:11, fontStyle:"italic", padding:"6px 2px" }}>Not yet scheduled</div>
+            : <div style={{ display:"grid", gridTemplateColumns: round==="FINAL"||round==="THIRD"||round==="SF" ? "1fr" : "repeat(2,1fr)", gap:8 }}>
+                {matches.map((m,i)=><BracketMatch key={i} m={m} />)}
+              </div>
+          }
+        </div>
+      );
+    }
+
+    function Bracket() {
+      const [rounds,setRounds]=useState(null);
+      const [loading,setLoading]=useState(false);
+      const [lastUpdated,setLastUpdated]=useState(null);
+      const [error,setError]=useState(null);
+
+      const load=useCallback(async()=>{
+        setLoading(true); setError(null);
+        try {
+          const r=await fetchKnockout();
+          setRounds(r);
+          setLastUpdated(new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'}));
+        } catch(e) { setError("Couldn't load the bracket. Check your connection."); }
+        setLoading(false);
+      },[]);
+
+      useEffect(()=>{ load(); const t=setInterval(load,5*60*1000); return ()=>clearInterval(t); },[load]);
+
+      const order=["R32","R16","QF","SF","THIRD","FINAL"];
+      const totalMatches = rounds ? order.reduce((s,r)=>s+(rounds[r]?.length||0),0) : 0;
+      // Family members still alive: any team in a non-completed or winning position in the latest round
+      const aliveTeams = useMemo(()=>{
+        if (!rounds) return new Set();
+        const alive = new Set();
+        order.forEach(r=>{
+          (rounds[r]||[]).forEach(m=>{
+            if (m.completed) { if (m.winner) alive.add(m.winner); }
+            else { if (m.team1) alive.add(m.team1); if (m.team2) alive.add(m.team2); }
+          });
+        });
+        return alive;
+      },[rounds]);
+
+      return (
+        <div style={{ padding:"12px 16px 48px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+            <div style={{ fontSize:11, color:"#475569" }}>{loading?"⏳ Loading bracket…":lastUpdated?`Updated ${lastUpdated} · ${totalMatches} ties`:"Not yet loaded"}</div>
+            <button onClick={load} disabled={loading} style={{ padding:"5px 12px", borderRadius:6, fontSize:12, fontWeight:600, background:loading?"#0f172a":"#1e3a5f", color:loading?"#475569":"#60A5FA", border:"1px solid #1e3a5f" }}>{loading?"Loading…":"↻ Refresh"}</button>
+          </div>
+          <div style={{ marginBottom:14, fontSize:10, color:"#475569", display:"flex", flexWrap:"wrap", gap:10 }}>
+            <span>✓ = advanced</span>
+            {Object.entries(ROLES).map(([role,{icon}])=><span key={role}>{icon} {role}</span>)}
+          </div>
+          {error&&<div style={{ background:"#1a1010", border:"1px solid #7f1d1d", borderRadius:8, padding:"10px 14px", marginBottom:12, color:"#fca5a5", fontSize:12 }}>{error}</div>}
+          {!loading && totalMatches===0 && !error && (
+            <div style={{ textAlign:"center", padding:"40px 20px", color:"#475569" }}>
+              <div style={{ fontSize:36, marginBottom:10 }}>🗺️</div>
+              <div style={{ fontSize:14, fontWeight:600, color:"#64748b", marginBottom:4 }}>The knockout bracket appears here</div>
+              <div style={{ fontSize:12 }}>Round of 32 kicks off 28 June</div>
+            </div>
+          )}
+          {rounds && totalMatches>0 && order.map(r=>(
+            (rounds[r] && rounds[r].length>0)
+              ? <RoundColumn key={r} round={r} matches={rounds[r]} />
+              : null
+          ))}
+        </div>
+      );
+    }
+
     function App() {
       const [tab,setTab]=useState("schedule");
       const [selectedDate,setSelectedDate]=useState("All");
@@ -551,7 +767,7 @@
       return (
         <div style={{ minHeight:"100vh", background:"#020817" }}>
           <div style={{ position:"relative", background:"linear-gradient(135deg,#0a1628 0%,#0f2351 100%)", borderBottom:"1px solid #1e3a5f", padding:"20px 20px 14px", textAlign:"center" }}>
-            <span style={{ position:"absolute", top:10, right:12, padding:"2px 8px", borderRadius:99, background:"#1e293b", border:"1px solid #334155", color:"#475569", fontSize:10, fontWeight:700, letterSpacing:1 }}>V7</span>
+            <span style={{ position:"absolute", top:10, right:12, padding:"2px 8px", borderRadius:99, background:"#1e293b", border:"1px solid #334155", color:"#475569", fontSize:10, fontWeight:700, letterSpacing:1 }}>V10</span>
             <div style={{ fontSize:26, marginBottom:3 }}>🏆</div>
             <h1 style={{ margin:0, fontSize:21, fontWeight:900, letterSpacing:1, color:"#f1f5f9" }}>Family World Cup 2026</h1>
             <p style={{ margin:"3px 0 8px", color:"#64748b", fontSize:12 }}>27 members · 72 group matches · Times in SAST</p>
@@ -561,9 +777,9 @@
           </div>
 
           <div style={{ display:"flex", borderBottom:"1px solid #1e293b", background:"#080f1e" }}>
-            {["schedule","leaderboard","standings"].map(t=>(
-              <button key={t} onClick={()=>setTab(t)} style={{ flex:1, padding:"11px 0", fontSize:12, fontWeight:700, color:tab===t?"#f1f5f9":"#475569", borderBottom:tab===t?"2px solid #FBBF24":"2px solid transparent", letterSpacing:0.3 }}>
-                {t==="schedule"?"📅 Schedule":t==="leaderboard"?"🏅 Family":"🌍 Standings"}
+            {["schedule","leaderboard","standings","bracket"].map(t=>(
+              <button key={t} onClick={()=>setTab(t)} style={{ flex:1, padding:"11px 0", fontSize:11, fontWeight:700, color:tab===t?"#f1f5f9":"#475569", borderBottom:tab===t?"2px solid #FBBF24":"2px solid transparent", letterSpacing:0.2 }}>
+                {t==="schedule"?"📅 Schedule":t==="leaderboard"?"🏅 Family":t==="standings"?"🌍 Groups":"🗺️ Knock Out Tree"}
               </button>
             ))}
           </div>
@@ -612,6 +828,7 @@
 
           {tab==="leaderboard" && <Leaderboard/>}
           {tab==="standings" && <Standings/>}
+          {tab==="bracket" && <Bracket/>}
         </div>
       );
     }
